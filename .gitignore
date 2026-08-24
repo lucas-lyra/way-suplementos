@@ -1,0 +1,27 @@
+# --- Streamlit Secrets & Credentials ---
+.streamlit/secrets.toml
+secrets.toml
+.env
+.env.*
+
+# --- Python Cache & Bytecode ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# --- Ambientes Virtuais ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- IDEs e Editores ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Sistema Operacional ---
+.DS_Store
+Thumbs.db
