@@ -27,6 +27,10 @@ if 'autenticado' not in st.session_state:
     st.session_state['autenticado'] = False
 if 'usuario' not in st.session_state:
     st.session_state['usuario'] = "Operador"
+if 'bip_entrada_key_idx' not in st.session_state:
+    st.session_state['bip_entrada_key_idx'] = 0
+if 'bip_saida_key_idx' not in st.session_state:
+    st.session_state['bip_saida_key_idx'] = 0
 
 def realizar_login(apelido, senha):
     try:
@@ -354,10 +358,11 @@ def tela_principal():
         st.divider()
         st.button("Sair (Logout)", on_click=fazer_logout, type="primary")
 
-    aba_estoque, aba_perdas, aba_envios = st.tabs([
+    aba_estoque, aba_saida, aba_envios, aba_perdas = st.tabs([
         "📦 Estoque & Validades", 
-        "🗑️ Histórico de Baixas & Perdas", 
-        "🚚 Histórico de Envios (Lojas)"
+        "🚚 Saída & Despacho (FEFO)",
+        "📋 Histórico de Envios (Lojas)",
+        "🗑️ Histórico de Baixas & Perdas"
     ])
 
     with aba_estoque:
@@ -441,7 +446,7 @@ def tela_principal():
                 
                 codigo_bipado = st.text_input(
                     "Bipe o Código de Barras aqui:", 
-                    key="leitor_bip",
+                    key=f"leitor_bip_{st.session_state['bip_entrada_key_idx']}",
                     placeholder="Passe o leitor de código de barras..."
                 )
                 
@@ -472,7 +477,7 @@ def tela_principal():
                             
                             if btn_confirmar_entrada:
                                 if salvar_produto(unidade, cod_limpo, nome_encontrado, marca_encontrada, val_chegou, qtd_chegou, obs_chegou):
-                                    st.session_state['leitor_bip'] = ""
+                                    st.session_state['bip_entrada_key_idx'] += 1
                                     st.rerun()
                     else:
                         st.warning(f"⚠️ **Código de barras '{cod_limpo}' não encontrado no sistema!**\nVá na aba **'📦 Ficha do Produto (Cadastro Novo)'** acima para cadastrar a ficha deste produto pela primeira vez.")
@@ -665,6 +670,135 @@ def tela_principal():
                                         st.rerun()
         else:
             st.info("Nenhum produto encontrado nesta unidade.")
+
+    with aba_saida:
+        st.subheader(f"🚚 Saída & Despacho de Mercadorias para Lojas ({unidade})")
+        st.markdown("Separe e despache produtos para as lojas filiais com **sugestão inteligente FEFO (*First-Expired, First-Out*)**, garantindo que os lotes que vencem primeiro saiam antes do CD.")
+        
+        df_agrupado_saida, df_raw_saida = carregar_dados_brutos_e_agrupados()
+        df_estoque_unidade = df_raw_saida[df_raw_saida["Filial"] == unidade].copy() if not df_raw_saida.empty else pd.DataFrame()
+        
+        if df_estoque_unidade.empty:
+            st.info(f"Nenhum produto em estoque na unidade **{unidade}** para realizar saídas.")
+        else:
+            col_bip_s, col_sel_s = st.columns(2)
+            
+            with col_bip_s:
+                cod_saida_bipado = st.text_input(
+                    "⚡ Bipar Código de Barras para Saída:",
+                    key=f"leitor_bip_saida_{st.session_state['bip_saida_key_idx']}",
+                    placeholder="Passe o leitor aqui..."
+                )
+            
+            produtos_unicos = df_estoque_unidade.groupby(["codigo_barras", "nome", "marca"])["quantidade"].sum().reset_index()
+            opcoes_selecao = ["Selecione um produto..."] + [
+                f"{r['nome']} - {r['marca']} | Saldo Total: {r['quantidade']} un (Cód: {r['codigo_barras']})"
+                for _, r in produtos_unicos.iterrows()
+            ]
+            
+            with col_sel_s:
+                prod_selecionado_manual = st.selectbox(
+                    "Ou selecione o produto da lista:",
+                    options=opcoes_selecao,
+                    key="saida_sel_manual"
+                )
+            
+            cod_final_saida = None
+            if cod_saida_bipado:
+                cod_final_saida = cod_saida_bipado.strip()
+            elif prod_selecionado_manual != "Selecione um produto...":
+                cod_final_saida = prod_selecionado_manual.split("(Cód: ")[-1].replace(")", "").strip()
+            
+            if cod_final_saida:
+                lotes_do_produto = df_estoque_unidade[df_estoque_unidade["codigo_barras"] == cod_final_saida].copy()
+                lotes_do_produto = lotes_do_produto.sort_values(by="dt_obj")
+                
+                if lotes_do_produto.empty:
+                    st.error(f"⚠️ Não há lotes disponíveis em estoque com o código **{cod_final_saida}** na unidade **{unidade}**.")
+                else:
+                    primeiro_lote = lotes_do_produto.iloc[0]
+                    nome_prod_saida = primeiro_lote["nome"]
+                    marca_prod_saida = primeiro_lote["marca"]
+                    saldo_total_prod = lotes_do_produto["quantidade"].sum()
+                    
+                    st.divider()
+                    st.markdown(f"### 📦 Produto: **{nome_prod_saida}** ({marca_prod_saida})")
+                    st.caption(f"Código de Barras: `{cod_final_saida}` | Saldo Total na Unidade: **{saldo_total_prod} un**")
+                    
+                    status_fefo = classificar_validade(primeiro_lote['dias'])
+                    st.success(
+                        f"🎯 **Sugestão Inteligente FEFO:** Recomendamos despachar o **Lote com Validade em {primeiro_lote['validade_str']}** "
+                        f"({primeiro_lote['dias']} dias para vencer | Status: {status_fefo} | Saldo deste lote: **{primeiro_lote['quantidade']} un**)"
+                    )
+                    
+                    st.markdown("##### 📋 Lotes Disponíveis em Estoque (Ordenados por Vencimento):")
+                    tabela_lotes_view = []
+                    for _, lr in lotes_do_produto.iterrows():
+                        tabela_lotes_view.append({
+                            "Status": classificar_validade(lr["dias"]),
+                            "Validade": lr["validade_str"],
+                            "Dias p/ Vencer": lr["dias"],
+                            "Qtd Disponível": f"{lr['quantidade']} un",
+                            "Observações": lr["observacoes"]
+                        })
+                    st.dataframe(pd.DataFrame(tabela_lotes_view), use_container_width=True, hide_index=True)
+                    
+                    with st.form("form_despacho_fefo", clear_on_submit=True):
+                        st.markdown("#### 📝 Detalhes do Despacho para Loja")
+                        
+                        opcoes_lotes_dict = {}
+                        for _, lr in lotes_do_produto.iterrows():
+                            rotulo_lote = f"Validade: {lr['validade_str']} (Restam: {lr['dias']} dias) — Disponível: {lr['quantidade']} un"
+                            opcoes_lotes_dict[rotulo_lote] = lr
+                        
+                        lote_escolhido_rotulo = st.selectbox(
+                            "Qual lote deseja despachar? (Pré-selecionado o mais antigo pelo FEFO):",
+                            options=list(opcoes_lotes_dict.keys()),
+                            index=0
+                        )
+                        lote_alvo = opcoes_lotes_dict[lote_escolhido_rotulo]
+                        
+                        c_dest, c_qtd = st.columns(2)
+                        
+                        lojas_destino_opcoes = [f for f in lista_filiais if f != unidade]
+                        if not lojas_destino_opcoes:
+                            lojas_destino_opcoes = ["Loja Centro", "Loja Barra", "Loja Copacabana", "Loja Niterói", "Outra Loja"]
+                        
+                        with c_dest:
+                            loja_destino_sel = st.selectbox("Loja de Destino (Filial):", lojas_destino_opcoes)
+                        with c_qtd:
+                            qtd_despachar = st.number_input(
+                                "Quantidade a Despachar (Unidades):",
+                                min_value=1,
+                                max_value=int(lote_alvo["quantidade"]),
+                                value=min(int(lote_alvo["quantidade"]), 1),
+                                step=1
+                            )
+                        
+                        guia_obs = st.text_input(
+                            "Número do Romaneio / NF de Transferência / Observações:",
+                            placeholder="Ex: NF 9988 - Transferência para reposição de vitrine"
+                        )
+                        
+                        btn_despachar = st.form_submit_button("🚚 Confirmar Saída e Despacho para Loja", type="primary")
+                        
+                        if btn_despachar:
+                            usuario_atual = st.session_state.get('usuario', 'Operador')
+                            if registrar_envio_loja(
+                                lote_id=lote_alvo["id"],
+                                filial_origem_id=lote_alvo["filial_id"],
+                                filial_destino=loja_destino_sel,
+                                cod=lote_alvo["codigo_barras"],
+                                nome=lote_alvo["nome"],
+                                marca=lote_alvo["marca"],
+                                validade_str=str(lote_alvo["validade_str"]),
+                                qtd_enviada=qtd_despachar,
+                                qtd_total_lote=lote_alvo["quantidade"],
+                                obs=guia_obs,
+                                usuario=usuario_atual
+                            ):
+                                st.session_state['bip_saida_key_idx'] += 1
+                                st.rerun()
 
     with aba_perdas:
         st.subheader(f"🗑️ Histórico de Baixas & Perdas Financeiras: {unidade}")
