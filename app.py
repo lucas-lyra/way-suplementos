@@ -427,37 +427,84 @@ def tela_principal():
                     
                     st.link_button(f"📲 Solicitar Compra via WhatsApp para {contato_compras}", link_whats_ruptura, type="primary")
 
-        # --- ENTRADA COM LEITOR (BIP) ---
-        with st.expander("➕ Novo Lançamento de Estoque", expanded=False):
-            codigo_bipado = st.text_input("Gatilho do Leitor (Bipar Aqui):", key="leitor_bip")
-            nome_padrao = ""
-            marca_padrao = ""
+        # --- SEÇÃO: ENTRADA DE ESTOQUE & CADASTRO DE PRODUTOS ---
+        with st.expander("📥 Lançamento de Estoque & Ficha de Produtos", expanded=False):
+            sub_tab_bip, sub_tab_ficha = st.tabs([
+                "⚡ Entrada Rápida por Bipagem (Lotes)",
+                "📦 Ficha do Produto (Cadastro Novo)"
+            ])
             
-            if codigo_bipado:
-                try:
-                    res_busca = supabase.table("produtos").select("nome, marca").eq("codigo_barras", codigo_bipado).limit(1).execute()
-                    if res_busca.data:
-                        nome_padrao = res_busca.data[0]['nome']
-                        marca_padrao = res_busca.data[0]['marca']
-                        st.success(f"✅ Produto reconhecido: **{nome_padrao} - {marca_padrao}**")
-                except:
-                    pass
+            # ABA 1: BIPAGEM RÁPIDA DE ENTRADA
+            with sub_tab_bip:
+                st.markdown("#### ⚡ Entrada de Mercadoria por Bipagem")
+                st.info("👉 **Como usar o leitor:** Clique no campo abaixo, aponte o leitor de código de barras para o produto e bipe. O leitor digitará o código e dará Enter automaticamente.")
+                
+                codigo_bipado = st.text_input(
+                    "Bipe o Código de Barras aqui:", 
+                    key="leitor_bip",
+                    placeholder="Passe o leitor de código de barras..."
+                )
+                
+                if codigo_bipado:
+                    cod_limpo = codigo_bipado.strip()
+                    try:
+                        res_busca = supabase.table("produtos").select("nome, marca").eq("codigo_barras", cod_limpo).limit(1).execute()
+                    except Exception as e_busca:
+                        res_busca = None
+                        st.error(f"Erro ao consultar banco: {e_busca}")
+                    
+                    if res_busca and res_busca.data:
+                        nome_encontrado = res_busca.data[0]['nome']
+                        marca_encontrada = res_busca.data[0].get('marca', '')
+                        
+                        st.success(f"✅ **Produto Reconhecido:** {nome_encontrado} | **Marca:** {marca_encontrada} *(Código: {cod_limpo})*")
+                        
+                        with st.form("form_entrada_bipada", clear_on_submit=True):
+                            col_q, col_v = st.columns(2)
+                            with col_q:
+                                qtd_chegou = st.number_input("Quantidade que Chegou (Unidades)", min_value=1, value=1, step=1)
+                            with col_v:
+                                val_chegou = st.date_input("Data de Validade do Lote", value=date.today(), format="DD/MM/YYYY")
+                            
+                            obs_chegou = st.text_input("Observações / NF / Lote (Opcional)", placeholder="Ex: NF 12345 / Lote Fornecedor X")
+                            
+                            btn_confirmar_entrada = st.form_submit_button("📥 Confirmar Entrada no Estoque", type="primary")
+                            
+                            if btn_confirmar_entrada:
+                                if salvar_produto(unidade, cod_limpo, nome_encontrado, marca_encontrada, val_chegou, qtd_chegou, obs_chegou):
+                                    st.session_state['leitor_bip'] = ""
+                                    st.rerun()
+                    else:
+                        st.warning(f"⚠️ **Código de barras '{cod_limpo}' não encontrado no sistema!**\nVá na aba **'📦 Ficha do Produto (Cadastro Novo)'** acima para cadastrar a ficha deste produto pela primeira vez.")
 
-            with st.form("main_form", clear_on_submit=True):
-                c1, c2 = st.columns(2)
-                cod = c1.text_input("Código de Barras", value=codigo_bipado)
-                nome = c2.text_input("Nome do Produto", value=nome_padrao)
-                marca = st.text_input("Marca", value=marca_padrao)
+            # ABA 2: FICHA DO PRODUTO (CADASTRO NOVO)
+            with sub_tab_ficha:
+                st.markdown("#### 📦 Ficha do Produto (1º Cadastro)")
+                st.markdown("Cadastre aqui produtos que **nunca deram entrada** na Way Suplementos. O nome e marca ficarão salvos para as próximas bipagens.")
                 
-                c3, c4 = st.columns(2)
-                val = c3.date_input("Validade", format="DD/MM/YYYY")
-                qtd = c4.number_input("Quantidade", min_value=1)
-                obs = st.text_area("Observações")
-                
-                if st.form_submit_button("Salvar no Sistema"):
-                    if salvar_produto(unidade, cod, nome, marca, val, qtd, obs):
-                        st.session_state['leitor_bip'] = ""
-                        st.rerun()
+                with st.form("form_ficha_novo_produto", clear_on_submit=True):
+                    col_f1, col_f2 = st.columns(2)
+                    with col_f1:
+                        cod_ficha = st.text_input("Código de Barras", placeholder="Ex: 7891234567890 (ou bipe aqui)")
+                        nome_ficha = st.text_input("Nome Completo do Produto", placeholder="Ex: 100% Whey Gold Standard 900g Baunilha")
+                    with col_f2:
+                        marca_ficha = st.text_input("Marca / Fabricante", placeholder="Ex: Optimum Nutrition, Max Titanium, IntegralMedica...")
+                        val_ficha = st.date_input("Validade do Primeiro Lote", value=date.today(), format="DD/MM/YYYY")
+                    
+                    col_f3, col_f4 = st.columns(2)
+                    with col_f3:
+                        qtd_ficha = st.number_input("Quantidade Inicial (Unidades)", min_value=1, value=1, step=1)
+                    with col_f4:
+                        obs_ficha = st.text_input("Observações / NF (Opcional)", placeholder="Ex: 1º Cadastro / NF 9876")
+                    
+                    btn_salvar_ficha = st.form_submit_button("💾 Salvar Ficha e Dar Entrada no Estoque", type="primary")
+                    
+                    if btn_salvar_ficha:
+                        if cod_ficha and nome_ficha:
+                            if salvar_produto(unidade, cod_ficha.strip(), nome_ficha.strip(), marca_ficha.strip(), val_ficha, qtd_ficha, obs_ficha):
+                                st.rerun()
+                        else:
+                            st.warning("⚠️ Preencha pelo menos o **Código de Barras** e o **Nome do Produto**.")
 
         st.divider()
         st.subheader(f"📋 Estoque Consolidado: {unidade}")
