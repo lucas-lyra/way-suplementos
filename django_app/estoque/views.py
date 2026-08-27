@@ -282,9 +282,19 @@ def usuarios(request):
         usuario_alvo = get_object_or_404(User, pk=request.POST.get("user_id"))
         form = UsuarioPerfilForm(request.POST)
         if form.is_valid():
-            usuario_alvo.groups.set([form.cleaned_data["grupo"]])
+            grupo = form.cleaned_data["grupo"]
+            usuario_alvo.groups.set([grupo])
             usuario_alvo.is_active = form.cleaned_data["ativo"]
-            usuario_alvo.save(update_fields=["is_active"])
+            # Mantém is_superuser/is_staff sincronizados com o perfil escolhido.
+            # Sem isso, alguém que já foi superusuário (ex: bootstrap do primeiro
+            # cadastro do sistema, ou criado via createsuperuser) continuava com
+            # acesso total mesmo depois de reatribuído a outro perfil aqui — o
+            # em_grupo() sempre libera quem tem is_superuser=True, então essa
+            # flag precisa acompanhar o grupo, não só ficar registrada uma vez.
+            eh_admin_agora = grupo.name == GRUPO_ADMIN
+            usuario_alvo.is_superuser = eh_admin_agora
+            usuario_alvo.is_staff = eh_admin_agora
+            usuario_alvo.save(update_fields=["is_active", "is_superuser", "is_staff"])
             messages.success(request, f"Perfil de '{usuario_alvo.username}' atualizado!")
         return redirect("estoque:usuarios")
 
