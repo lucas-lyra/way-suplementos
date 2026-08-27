@@ -1,0 +1,75 @@
+{% extends "estoque/base.html" %}
+{% block title %}Lojas — Way Suplementos{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">🏬 Gestão de Lojas</h1>
+
+<div class="table-responsive mb-4">
+  <table class="table table-sm table-striped align-middle">
+    <thead><tr><th>Nome</th><th>Endereço</th><th></th></tr></thead>
+    <tbody>
+    {% for loja in lojas_lista %}
+      <tr>
+        <td>{{ loja.nome }}</td>
+        <td>{{ loja.endereco|default:"-" }}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editar-{{ loja.id }}">Editar</button>
+          <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#excluir-{{ loja.id }}">Excluir</button>
+        </td>
+      </tr>
+      <tr class="collapse" id="editar-{{ loja.id }}">
+        <td colspan="3">
+          <form method="post" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="editar">
+            <input type="hidden" name="loja_id" value="{{ loja.id }}">
+            <div class="col-12 col-md-4">
+              <label class="form-label">Nome</label>
+              <input type="text" name="nome" class="form-control" value="{{ loja.nome }}" required>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Endereço</label>
+              <textarea name="endereco" class="form-control" rows="2">{{ loja.endereco|default:"" }}</textarea>
+            </div>
+            <div class="col-12 col-md-2">
+              <button type="submit" class="btn btn-primary w-100">Salvar</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+      <tr class="collapse" id="excluir-{{ loja.id }}">
+        <td colspan="3">
+          <form method="post" class="d-flex align-items-center gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="excluir">
+            <input type="hidden" name="loja_id" value="{{ loja.id }}">
+            <span class="text-muted small">Confirma excluir "{{ loja.nome }}"? Só funciona se ela não tiver estoque/movimentações associadas.</span>
+            <button type="submit" class="btn btn-sm btn-danger">Confirmar Exclusão</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">Nova Loja</h5>
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="criar">
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ form_novo.nome.label }}</label>
+        {{ form_novo.nome }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ form_novo.endereco.label }}</label>
+        {{ form_novo.endereco }}
+      </div>
+      <div class="col-12 col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100">Criar Loja</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

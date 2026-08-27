@@ -1,6 +1,11 @@
 """Controle de acesso por perfil, usando django.contrib.auth.Group como perfil
-(cd / compra_venda / admin), conforme pedido no briefing ("usar sistema de auth
-do Django + grupos/permissions")."""
+(cd / compra_venda / admin / motorista), conforme pedido no briefing ("usar
+sistema de auth do Django + grupos/permissions").
+
+compra_venda e Coordenador/Admin têm exatamente o mesmo nível de acesso hoje
+(recebimento direto, remanejamento, rotas, aprovação/rejeição, gestão de
+lojas e usuários) — os dois nomes de grupo continuam existindo separados só
+para refletir o cargo da pessoa na empresa, não uma diferença de permissão."""
 from functools import wraps
 
 from django.contrib.auth.decorators import login_required
@@ -9,6 +14,7 @@ from django.core.exceptions import PermissionDenied
 GRUPO_CD = "CD"
 GRUPO_COMPRA_VENDA = "Compra e Venda"
 GRUPO_ADMIN = "Coordenador/Admin"
+GRUPO_MOTORISTA = "Motorista"
 
 GRUPOS_ACESSO_TOTAL = (GRUPO_COMPRA_VENDA, GRUPO_ADMIN)
 
@@ -32,6 +38,10 @@ def tem_acesso_total(user):
 
 def eh_admin(user):
     return em_grupo(user, GRUPO_ADMIN)
+
+
+def eh_motorista(user):
+    return em_grupo(user, GRUPO_MOTORISTA)
 
 
 def perfil_required(*nomes_grupos):

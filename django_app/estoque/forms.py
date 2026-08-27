@@ -55,15 +55,60 @@ class NovoProdutoItemForm(ItemNFForm):
     field_order = ["nome", "marca", "validade", "quantidade", "observacao"]
 
 
-class RemanejamentoForm(forms.Form):
+class CabecalhoMovimentacaoForm(forms.Form):
+    """Cabeçalho compartilhado por Remanejamento e criação de Rota — loja de
+    origem/destino + bipagem, tudo num formulário só (mesmo padrão do
+    CabecalhoNFForm)."""
+    loja_origem = forms.ModelChoiceField(
+        label="Loja de Origem", queryset=Loja.objects.all().order_by("nome"), widget=_select(),
+    )
     loja_destino = forms.ModelChoiceField(
         label="Loja de Destino", queryset=Loja.objects.all().order_by("nome"), widget=_select(),
     )
-    quantidade = forms.IntegerField(
-        label="Quantidade a Remanejar", min_value=1,
-        widget=forms.NumberInput(attrs={"class": "form-control"}),
+    codigo_barras = forms.CharField(
+        label="Bipagem", required=False,
+        widget=forms.TextInput(attrs={
+            "class": "form-control form-control-lg", "autofocus": True,
+            "autocomplete": "off", "placeholder": "Bipe ou digite o código de barras...",
+        }),
     )
-    observacoes = forms.CharField(label="Observações / Guia de Transferência", required=False, widget=_text())
+
+
+class LojaForm(forms.Form):
+    nome = forms.CharField(label="Nome da Loja/CD", widget=_text())
+    endereco = forms.CharField(label="Endereço", required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}))
+
+
+class RotaCabecalhoForm(forms.Form):
+    numero = forms.CharField(label="Número da NF de Saída", widget=_text())
+    loja_origem = forms.ModelChoiceField(
+        label="Loja/CD de Origem", queryset=Loja.objects.all().order_by("nome"), widget=_select(),
+    )
+    motorista = forms.ModelChoiceField(
+        label="Motorista", queryset=User.objects.none(), widget=_select(), required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .permissions import GRUPO_MOTORISTA
+        self.fields["motorista"].queryset = User.objects.filter(groups__name=GRUPO_MOTORISTA).order_by("username")
+
+
+class ParadaForm(forms.Form):
+    loja_destino = forms.ModelChoiceField(
+        label="Loja de Destino", queryset=Loja.objects.all().order_by("nome"), widget=_select(),
+    )
+    prazo = forms.DateTimeField(
+        label="Prazo de Entrega (opcional)", required=False,
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local", "class": "form-control"}),
+    )
+    codigo_barras = forms.CharField(
+        label="Bipagem", required=False,
+        widget=forms.TextInput(attrs={
+            "class": "form-control form-control-lg", "autofocus": True,
+            "autocomplete": "off", "placeholder": "Bipe ou digite o código de barras...",
+        }),
+    )
 
 
 class UsuarioPerfilForm(forms.Form):

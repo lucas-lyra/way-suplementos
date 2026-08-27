@@ -11,7 +11,7 @@
       <h5 class="card-title mb-1">NF {{ nf.numero }}{% if nf.fornecedor %} — {{ nf.fornecedor }}{% endif %}</h5>
       <p class="card-text mb-3 text-muted small">
         Destino: <strong>{{ nf.loja_destino.nome }}</strong> |
-        Lançado por <strong>{{ nf.responsavel.username }}</strong> em {{ nf.data_recebimento|date:"d/m/Y H:i" }}
+        Recebido por <strong>{{ nf.responsavel.username }}</strong> em {{ nf.data_recebimento|date:"d/m/Y H:i" }}
       </p>
 
       <div class="table-responsive mb-3">

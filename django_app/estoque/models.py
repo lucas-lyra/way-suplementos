@@ -42,9 +42,13 @@ class Produto(models.Model):
 
 
 class Loja(models.Model):
-    """Lojas e o próprio CD, tratado como mais uma loja. Tabela já existente."""
+    """Lojas e o próprio CD, tratado como mais uma loja. Tabela já existente —
+    o campo `endereco` é NOVO, adicionado via ALTER TABLE (ver
+    sql_migracao_rotas.sql), necessário para as Paradas de Rota mostrarem
+    endereço de entrega."""
     id = models.BigAutoField(primary_key=True)
     nome = models.CharField(max_length=255, unique=True)
+    endereco = models.CharField(max_length=500, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -86,6 +90,17 @@ class Lote(models.Model):
     @property
     def dias_para_vencer(self):
         return (self.validade - date.today()).days
+
+    @property
+    def item_nf_origem(self):
+        """Item de NotaFiscal mais recente que originou (ou somou a) este
+        lote — usado na Planilha Compartilhada para "consultar de qual NF um
+        item veio" (só existe para lotes que vieram de recebimento por NF;
+        lotes de remanejamento/rota não têm origem de NF direta)."""
+        itens = list(self.itens_nota_fiscal_origem.all())
+        if not itens:
+            return None
+        return max(itens, key=lambda i: i.nota_fiscal.data_recebimento)
 
     @property
     def status_validade(self):
@@ -212,3 +227,108 @@ class ItemNotaFiscal(models.Model):
 
     def __str__(self):
         return f"{self.produto} — {self.quantidade} un (NF {self.nota_fiscal.numero})"
+
+
+STATUS_ROTA_CHOICES = [
+    ("em_rota", "Em Rota"),
+    ("concluida", "Concluída"),
+    ("atrasada", "Atrasada"),
+]
+
+STATUS_PARADA_CHOICES = [
+    ("pendente", "Pendente"),
+    ("aguardando", "Aguardando"),
+    ("recebido", "Recebido"),
+    ("atrasado", "Atrasado"),
+]
+
+
+class NotaFiscalSaida(models.Model):
+    """Uma rota de entrega: sai do CD/loja de origem e passa por várias lojas
+    de destino em sequência (ParadaRota). O produto já sai do estoque de
+    origem no momento em que a rota é criada — cada parada, ao ser marcada
+    como entregue, é que soma o estoque na loja de destino (sem exigir
+    confirmação separada de alguém da loja receptora)."""
+    numero = models.CharField("Número da NF", max_length=50)
+    loja_origem = models.ForeignKey(Loja, on_delete=models.PROTECT, related_name="rotas_saida")
+    responsavel_envio = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="rotas_enviadas"
+    )
+    # Não estava no modelo do briefing, mas é necessário: "marcar como entregue
+    # visível e funcional só para o motorista designado" pressupõe que exista
+    # um motorista atribuído à rota.
+    motorista = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="rotas_atribuidas"
+    )
+    data_envio = models.DateTimeField(default=timezone.now)
+    status = models.CharField(max_length=20, choices=STATUS_ROTA_CHOICES, default="em_rota")
+
+    class Meta:
+        db_table = "notas_fiscais_saida"
+        ordering = ["-data_envio"]
+
+    def __str__(self):
+        return f"Rota {self.numero} — {self.loja_origem}"
+
+    @property
+    def status_calculado(self):
+        """'concluida' quando todas as paradas foram recebidas; 'atrasada' se
+        QUALQUER parada estiver com o prazo vencido sem ter sido recebida
+        (sem bloquear as demais); senão 'em_rota'. Calculado na hora — este
+        projeto não tem um job em background para reavaliar prazos sozinho."""
+        paradas = list(self.paradas.all())
+        if paradas and all(p.status == "recebido" for p in paradas):
+            return "concluida"
+        if any(p.status_calculado == "atrasado" for p in paradas):
+            return "atrasada"
+        return "em_rota"
+
+
+class ParadaRota(models.Model):
+    """Uma parada (loja de destino) dentro de uma rota de entrega, na ordem
+    definida manualmente (reordenada com botões subir/descer — ver nota sobre
+    drag-and-drop no resumo da conversa)."""
+    nota_fiscal_saida = models.ForeignKey(NotaFiscalSaida, on_delete=models.CASCADE, related_name="paradas")
+    loja_destino = models.ForeignKey(Loja, on_delete=models.PROTECT, related_name="paradas_recebidas")
+    ordem = models.PositiveIntegerField()
+    status = models.CharField(max_length=20, choices=STATUS_PARADA_CHOICES, default="aguardando")
+    # Não estava no modelo do briefing, mas "se uma parada passar do prazo
+    # definido" pressupõe um prazo persistido para comparar.
+    prazo = models.DateTimeField(null=True, blank=True)
+    data_recebimento = models.DateTimeField(null=True, blank=True)
+    recebido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="paradas_recebidas_por_mim"
+    )
+
+    class Meta:
+        db_table = "paradas_rota"
+        ordering = ["nota_fiscal_saida", "ordem"]
+
+    def __str__(self):
+        return f"Parada {self.ordem} — {self.loja_destino} ({self.nota_fiscal_saida})"
+
+    @property
+    def status_calculado(self):
+        if self.status == "recebido":
+            return "recebido"
+        if self.prazo and timezone.now() > self.prazo:
+            return "atrasado"
+        return self.status
+
+
+class ItemParada(models.Model):
+    """Um produto dentro de uma parada de rota. Sem campo de lote, mesma
+    lógica de FEFO por produto+validade do resto do sistema."""
+    parada = models.ForeignKey(ParadaRota, on_delete=models.CASCADE, related_name="itens")
+    produto = models.ForeignKey(Produto, on_delete=models.PROTECT, db_column="produto_id", related_name="itens_parada")
+    validade = models.DateField()
+    quantidade = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = "itens_parada"
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.produto} — {self.quantidade} un"

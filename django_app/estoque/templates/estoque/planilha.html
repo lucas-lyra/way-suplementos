@@ -24,11 +24,11 @@
 <div class="table-responsive">
   <table class="table table-sm table-striped align-middle">
     <thead>
-      <tr><th>Status</th><th>Produto</th><th>Marca</th><th>Lote</th><th>Validade</th><th>Dias p/ Vencer</th><th>Qtd</th><th>Loja</th></tr>
+      <tr><th>Status</th><th>Produto</th><th>Marca</th><th>Validade</th><th>Dias p/ Vencer</th><th>Qtd</th><th>Loja</th><th>Origem (NF)</th></tr>
     </thead>
     <tbody>
     {% for lote in lotes %}
-      {% with status=lote.status_validade %}
+      {% with status=lote.status_validade origem=lote.item_nf_origem %}
       <tr class="{% if status.0 == 'vencido' %}table-dark{% elif status.0 == 'critico' %}table-danger{% elif status.0 == 'atencao' %}table-warning{% endif %}">
         <td>
           <span class="badge {% if status.0 == 'vencido' %}bg-dark{% elif status.0 == 'critico' %}bg-danger{% elif status.0 == 'atencao' %}bg-warning text-dark{% else %}bg-success{% endif %}">
@@ -37,11 +37,18 @@
         </td>
         <td>{{ lote.produto.nome }}</td>
         <td>{{ lote.produto.marca|default:"-" }}</td>
-        <td>{{ lote.lote|default:"-" }}</td>
         <td>{{ lote.validade|date:"d/m/Y" }}</td>
         <td>{{ lote.dias_para_vencer }}</td>
         <td>{{ lote.quantidade }}</td>
         <td>{{ lote.loja_atual.nome }}</td>
+        <td class="small">
+          {% if origem %}
+            NF {{ origem.nota_fiscal.numero }}<br>
+            <span class="text-muted">Recebido por {{ origem.nota_fiscal.responsavel.username }}</span>
+          {% else %}
+            <span class="text-muted">-</span>
+          {% endif %}
+        </td>
       </tr>
       {% endwith %}
     {% empty %}

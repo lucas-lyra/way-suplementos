@@ -13,9 +13,10 @@ versão anterior (ligada ao Supabase Auth) ficou órfã no banco, sem uso.
 
 | Grupo (perfil) | O que pode fazer |
 |---|---|
-| **CD** | Só lança entrada (recebimento). Toda entrada nasce **pendente**. |
-| **Compra e Venda** | Acesso total: recebimento direto, remanejamento, aprova/rejeita entradas do CD. |
-| **Coordenador/Admin** | Mesmo que Compra e Venda + Gestão de Usuários. |
+| **CD** | Só a tela de Recebimento. Toda entrada nasce **pendente**. Sem acesso a remanejamento, rotas, aprovação, lojas ou usuários. |
+| **Compra e Venda** | Acesso total: recebimento direto, remanejamento, rotas de entrega, aprova/rejeita (por item ou NF inteira), gestão de lojas e de usuários. |
+| **Coordenador/Admin** | Exatamente o mesmo acesso de Compra e Venda hoje — os dois grupos só existem separados para refletir o cargo da pessoa, não uma diferença de permissão. |
+| **Motorista** | Só a tela de Rotas de Entrega — vê as rotas atribuídas a ele e marca paradas como entregues. Sem acesso a mais nada. |
 
 Regra central: nenhum lançamento do perfil **CD** conta como estoque disponível
 até ser aprovado.
@@ -68,27 +69,35 @@ Abra `sql_migracao_django.sql` no SQL Editor do Supabase e rode. Ele adiciona
 `responsavel_user_id`) — a última é uma FK para `auth_user`, por isso precisa
 rodar **depois** do passo 3.
 
-### 5. Criar o primeiro usuário (admin)
+Rode também `sql_migracao_rotas.sql` — adiciona a coluna `endereco` em `lojas`
+(usada pelas Paradas de Rota). Pode rodar em qualquer ordem em relação ao
+anterior, contanto que seja depois do `migrate`.
+
+### 5. Popular dados de exemplo (opcional)
 
 ```powershell
-python manage.py createsuperuser
+python manage.py seed_demo
 ```
 
-Depois de criado, entre no [Django Admin](http://127.0.0.1:8000/admin/) →
-**Groups** e adicione esse usuário ao grupo **Coordenador/Admin** (ou use a
-própria tela de Gestão de Usuários do app depois de logar). Superusuário
-sempre tem acesso total, mas só entra num grupo automaticamente se você
-adicionar manualmente aqui.
+Cria 10 produtos fictícios de suplementos + lotes de exemplo com validades
+variadas (vencido, crítico, ok) na loja "Centro de Distribuição" — útil pra
+testar Remanejamento, Rotas e a Planilha sem digitar tudo na mão. Idempotente.
 
-### 6. Rodar o servidor
+### 7. Rodar o servidor e criar o primeiro usuário (admin)
 
 ```powershell
 python manage.py runserver
 ```
 
-Acesse http://127.0.0.1:8000/ — vai pedir login. Depois de logado como
-admin/superusuário, dá pra criar as lojas (a primeira entrada já cria a loja
-automaticamente) e liberar outras contas em **Usuários**.
+Acesse http://127.0.0.1:8000/cadastro/ e crie uma conta — como é o **primeiro
+cadastro do sistema**, ela vira admin automaticamente (bootstrap; sem isso
+ninguém teria perfil pra liberar os próximos). Alternativa via terminal:
+`python manage.py createsuperuser` (aí precisa entrar no
+[Django Admin](http://127.0.0.1:8000/admin/) → Groups e adicionar ao grupo
+"Coordenador/Admin" manualmente).
+
+Depois de logado como admin, crie as lojas em **Lojas** (menu superior) e
+libere outras contas em **Usuários**.
 
 ## Deploy no Render
 
@@ -108,9 +117,9 @@ O `render.yaml` na raiz do repositório já descreve o serviço inteiro
    - Rodar `migrate` (cria as tabelas do Django no mesmo Postgres do Supabase —
      idempotente, seguro rodar de novo se você já rodou localmente)
    - Subir o servidor com `gunicorn`
-6. Depois que o deploy terminar, rode `sql_migracao_django.sql` no Supabase se
-   ainda não tiver rodado (mesma instrução do passo 4 acima) — isso não é
-   automatizado pelo deploy.
+6. Depois que o deploy terminar, rode `sql_migracao_django.sql` e
+   `sql_migracao_rotas.sql` no Supabase se ainda não tiver rodado (mesma
+   instrução do passo 4 acima) — isso não é automatizado pelo deploy.
 7. Acesse a URL que o Render gerar (`https://way-suplementos-xxxx.onrender.com`)
    e vá em `/cadastro/` pra criar a primeira conta (vira admin automaticamente,
    igual no ambiente local).
@@ -130,18 +139,23 @@ manualmente as mesmas variáveis de ambiente que estão no `render.yaml`.
 django_app/
 ├── manage.py
 ├── requirements.txt
-├── .env.example          # copie para .env e preencha
-├── sql_migracao_django.sql
-├── waysuplementos/       # settings, urls, wsgi/asgi
-└── estoque/               # app principal
-    ├── models.py          # Produto/Loja/Lote/Movimentacao — managed=False
-    ├── permissions.py      # controle de acesso por Group (perfil)
+├── .env.example              # copie para .env e preencha
+├── sql_migracao_django.sql   # colunas novas em movimentacoes
+├── sql_migracao_rotas.sql    # coluna endereco em lojas
+├── waysuplementos/           # settings, urls, wsgi/asgi
+└── estoque/                   # app principal
+    ├── models.py              # Produto/Loja/Lote/Movimentacao — managed=False
+                                # NotaFiscal/ItemNotaFiscal/NotaFiscalSaida/
+                                # ParadaRota/ItemParada — managed=True (Django cria)
+    ├── permissions.py          # controle de acesso por Group (perfil)
     ├── views.py
     ├── forms.py
     ├── admin.py
     ├── urls.py
     ├── migrations/
-    └── templates/estoque/  # Bootstrap 5 (via CDN), mobile-first
+    ├── management/commands/
+    │   └── seed_demo.py        # popula produtos/lotes fictícios (opcional)
+    └── templates/estoque/      # Bootstrap 5 (via CDN), mobile-first
 ```
 
 ## Funcionalidades que a versão anterior (Streamlit) tinha e esta não tem

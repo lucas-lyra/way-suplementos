@@ -1,0 +1,96 @@
+{% extends "estoque/base.html" %}
+{% block title %}Rotas de Entrega — Way Suplementos{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+  <h1 class="h3 mb-0">🚚 Rotas de Entrega</h1>
+  {% if perms_acesso_total %}
+  <a href="{% url 'estoque:rotas_criar' %}" class="btn btn-primary">+ Nova Rota</a>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="card text-center">
+      <div class="card-body">
+        <div class="h2 mb-0">{{ total_ativas }}</div>
+        <div class="text-muted small">Rotas Ativas</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card text-center">
+      <div class="card-body">
+        <div class="h2 mb-0">{{ total_hoje }}</div>
+        <div class="text-muted small">Paradas Previstas Hoje</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card text-center border-danger">
+      <div class="card-body">
+        <div class="h2 mb-0 text-danger">{{ total_atrasadas }}</div>
+        <div class="text-muted small">Paradas Atrasadas</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if rotas %}
+  {% for item in rotas %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+        <div>
+          <h5 class="card-title mb-1">Rota {{ item.rota.numero }} — origem: {{ item.rota.loja_origem.nome }}</h5>
+          <p class="text-muted small mb-0">
+            Enviado por {{ item.rota.responsavel_envio.username }} em {{ item.rota.data_envio|date:"d/m/Y H:i" }}
+            {% if item.rota.motorista %} | Motorista: {{ item.rota.motorista.username }}{% endif %}
+          </p>
+        </div>
+        <span class="badge {% if item.status_calculado == 'concluida' %}bg-success{% elif item.status_calculado == 'atrasada' %}bg-danger{% else %}bg-primary{% endif %}">
+          {% if item.status_calculado == 'concluida' %}Concluída{% elif item.status_calculado == 'atrasada' %}Atrasada{% else %}Em Rota{% endif %}
+        </span>
+      </div>
+
+      <ol class="list-group list-group-numbered">
+        {% for parada in item.rota.paradas.all %}
+        <li class="list-group-item d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div>
+            <strong>{{ parada.loja_destino.nome }}</strong>
+            {% if parada.loja_destino.endereco %}<div class="text-muted small">{{ parada.loja_destino.endereco }}</div>{% endif %}
+            <div class="small">
+              {% for it in parada.itens.all %}
+                <span class="badge bg-light text-dark border">{{ it.produto.nome }} ({{ it.quantidade }}un)</span>
+              {% endfor %}
+            </div>
+            {% if parada.status == "recebido" %}
+              <div class="text-success small mt-1">Recebido por {{ parada.recebido_por.username }} em {{ parada.data_recebimento|date:"d/m/Y H:i" }}</div>
+            {% elif parada.prazo %}
+              <div class="text-muted small mt-1">Prazo: {{ parada.prazo|date:"d/m/Y H:i" }}</div>
+            {% endif %}
+          </div>
+          <div class="text-end">
+            {% with sc=parada.status_calculado %}
+            <span class="badge {% if sc == 'recebido' %}bg-success{% elif sc == 'atrasado' %}bg-danger{% else %}bg-warning text-dark{% endif %} mb-2 d-block">
+              {% if sc == 'recebido' %}Recebido{% elif sc == 'atrasado' %}Atrasado{% else %}Aguardando{% endif %}
+            </span>
+            {% if sc != "recebido" and item.pode_marcar %}
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="marcar_entregue">
+                <input type="hidden" name="parada_id" value="{{ parada.id }}">
+                <button type="submit" class="btn btn-sm btn-success">Marcar como Entregue</button>
+              </form>
+            {% endif %}
+            {% endwith %}
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <p class="text-muted">Nenhuma rota de entrega registrada ainda.</p>
+{% endif %}
+{% endblock %}

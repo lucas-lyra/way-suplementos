@@ -21,13 +21,24 @@
     </button>
     <div class="collapse navbar-collapse" id="navMenu">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        {% if perms_cd %}
         <li class="nav-item"><a class="nav-link" href="{% url 'estoque:recebimento' %}">Recebimento</a></li>
-        {% if perms_acesso_total %}
-        <li class="nav-item"><a class="nav-link" href="{% url 'estoque:remanejamento' %}">Remanejamento</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'estoque:planilha' %}">Planilha</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'estoque:pendencias' %}">Pendências</a></li>
         {% endif %}
-        {% if perms_admin %}
+        {% if perms_motorista %}
+        <li class="nav-item"><a class="nav-link" href="{% url 'estoque:rotas_painel' %}">Rotas de Entrega</a></li>
+        {% endif %}
+        {% if perms_acesso_total %}
+        <li class="nav-item"><a class="nav-link" href="{% url 'estoque:recebimento' %}">Recebimento</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'estoque:pendencias' %}">
+            Aprovações
+            {% if contador_pendencias %}<span class="badge bg-danger">{{ contador_pendencias }}</span>{% endif %}
+          </a>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'estoque:remanejamento' %}">Remanejamento</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'estoque:rotas_painel' %}">Rotas de Entrega</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'estoque:planilha' %}">Estoque</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'estoque:lojas' %}">Lojas</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'estoque:usuarios' %}">Usuários</a></li>
         {% endif %}
       </ul>

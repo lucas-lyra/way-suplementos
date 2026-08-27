@@ -1,0 +1,169 @@
+{% extends "estoque/base.html" %}
+{% block title %}Nova Rota — Way Suplementos{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">🚚 Nova Rota de Entrega</h1>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title">Dados da Rota</h5>
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="salvar_cabecalho">
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ cabecalho_form.numero.label }}</label>
+        {{ cabecalho_form.numero }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ cabecalho_form.loja_origem.label }}</label>
+        {{ cabecalho_form.loja_origem }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{{ cabecalho_form.motorista.label }}</label>
+        {{ cabecalho_form.motorista }}
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-outline-primary btn-sm">Salvar Dados da Rota</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if not loja_origem_definida %}
+<div class="alert alert-info">Preencha e salve os dados da rota (principalmente a loja de origem) antes de adicionar paradas.</div>
+{% else %}
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title">Adicionar Parada</h5>
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="adicionar_parada">
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ parada_form.loja_destino.label }}</label>
+        {{ parada_form.loja_destino }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{{ parada_form.prazo.label }}</label>
+        {{ parada_form.prazo }}
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary btn-sm">Adicionar Parada</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if paradas %}
+<h2 class="h5 mb-3">Paradas da Rota (na ordem de entrega)</h2>
+{% for parada in paradas %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <form method="post" class="mb-0 flex-grow-1">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="expandir_parada">
+      <input type="hidden" name="idx" value="{{ parada.idx }}">
+      <button type="submit" class="btn btn-link text-decoration-none text-start p-0">
+        {% if parada.aberto %}▾{% else %}▸{% endif %}
+        <strong>{{ forloop.counter }}º</strong> — {{ parada.loja_destino_nome }}
+        ({{ parada.total_itens }} iten{{ parada.total_itens|pluralize:"s" }})
+        {% if parada.prazo %}<span class="text-muted small">prazo: {{ parada.prazo }}</span>{% endif %}
+      </button>
+    </form>
+    <div class="d-flex gap-1">
+      <form method="post" class="mb-0"><input type="hidden" name="acao" value="mover_parada">{% csrf_token %}<input type="hidden" name="idx" value="{{ parada.idx }}"><input type="hidden" name="direcao" value="cima"><button type="submit" class="btn btn-sm btn-outline-secondary">▲ Subir</button></form>
+      <form method="post" class="mb-0"><input type="hidden" name="acao" value="mover_parada">{% csrf_token %}<input type="hidden" name="idx" value="{{ parada.idx }}"><input type="hidden" name="direcao" value="baixo"><button type="submit" class="btn btn-sm btn-outline-secondary">▼ Descer</button></form>
+      <form method="post" class="mb-0"><input type="hidden" name="acao" value="remover_parada">{% csrf_token %}<input type="hidden" name="idx" value="{{ parada.idx }}"><button type="submit" class="btn btn-sm btn-outline-danger">Remover</button></form>
+    </div>
+  </div>
+
+  {% if parada.aberto %}
+  <div class="card-body">
+    <form method="post" class="row g-2 align-items-end mb-3">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="bipar_item">
+      <input type="hidden" name="parada_idx" value="{{ parada.idx }}">
+      <div class="col-12 col-md-8">
+        <label class="form-label">🔍 Bipagem</label>
+        <input type="text" name="codigo_barras" class="form-control form-control-lg" autocomplete="off" placeholder="Bipe ou digite o código de barras...">
+      </div>
+      <div class="col-12 col-md-4">
+        <button type="submit" class="btn btn-primary w-100">Adicionar Item</button>
+      </div>
+    </form>
+
+    {% if escolha_pendente and escolha_pendente.parada_idx == parada.idx %}
+    <div class="card mb-3 border-primary">
+      <div class="card-body">
+        <h6 class="card-title">Escolha a validade de: {{ escolha_pendente.produto_nome }}</h6>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead><tr><th>Validade</th><th>Disponível</th><th>Quantidade</th><th></th></tr></thead>
+            <tbody>
+            {% for opcao in escolha_pendente.opcoes %}
+              <tr>
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="acao" value="escolher_validade_item">
+                  <input type="hidden" name="lote_id" value="{{ opcao.lote_id }}">
+                  <td class="align-middle">{{ opcao.validade|date:"d/m/Y" }}</td>
+                  <td class="align-middle">{{ opcao.quantidade_disponivel }}</td>
+                  <td><input type="number" name="quantidade" class="form-control form-control-sm" min="1" max="{{ opcao.quantidade_disponivel }}" value="{{ opcao.quantidade_disponivel }}" style="max-width: 100px;"></td>
+                  <td><button type="submit" class="btn btn-sm btn-primary">Adicionar</button></td>
+                </form>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <form method="post"><input type="hidden" name="acao" value="cancelar_escolha">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-secondary">Cancelar</button></form>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if parada.itens %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Produto</th><th>Validade</th><th>Qtd</th><th></th></tr></thead>
+        <tbody>
+        {% for item in parada.itens %}
+          <tr>
+            <td>{{ item.produto_nome }}</td>
+            <td>{{ item.validade|date:"d/m/Y" }}</td>
+            <td>{{ item.quantidade }}</td>
+            <td>
+              <form method="post" class="mb-0">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="remover_item">
+                <input type="hidden" name="parada_idx" value="{{ parada.idx }}">
+                <input type="hidden" name="item_idx" value="{{ forloop.counter0 }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Remover</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-muted mb-0">Nenhum item bipado nesta parada ainda.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+<div class="d-flex flex-column flex-sm-row gap-2 mb-4">
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="enviar">
+    <button type="submit" class="btn btn-success">Confirmar Rota ({{ paradas|length }} parada{{ paradas|length|pluralize:"s" }})</button>
+  </form>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="cancelar">
+    <button type="submit" class="btn btn-outline-secondary">Cancelar Rota</button>
+  </form>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

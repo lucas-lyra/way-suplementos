@@ -3,72 +3,115 @@
 {% block content %}
 <h1 class="h3 mb-4">🔁 Remanejamento entre Lojas</h1>
 
-<form method="get" class="row g-2 align-items-end mb-4">
-  <div class="col-12 col-md-8">
-    <label class="form-label">Loja de Origem</label>
-    <select name="loja_origem" class="form-select" onchange="this.form.submit()">
-      <option value="">Selecione...</option>
-      {% for loja in lojas %}
-        <option value="{{ loja.id }}" {% if loja_origem and loja.id == loja_origem.id %}selected{% endif %}>{{ loja.nome }}</option>
-      {% endfor %}
-    </select>
-  </div>
-</form>
-
-{% if loja_origem %}
-  {% if lotes_origem %}
-  <div class="table-responsive mb-4">
-    <table class="table table-sm table-striped align-middle">
-      <thead><tr><th>Produto</th><th>Lote</th><th>Validade</th><th>Qtd</th><th></th></tr></thead>
-      <tbody>
-      {% for lote in lotes_origem %}
-        <tr class="{% if lote_selecionado and lote.id == lote_selecionado.id %}table-primary{% endif %}">
-          <td>{{ lote.produto.nome }}</td>
-          <td>{{ lote.lote|default:"-" }}</td>
-          <td>{{ lote.validade|date:"d/m/Y" }}</td>
-          <td>{{ lote.quantidade }}</td>
-          <td>
-            <a href="?loja_origem={{ loja_origem.id }}&amp;lote_id={{ lote.id }}" class="btn btn-sm btn-outline-primary">Selecionar</a>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-    <p class="text-muted">Nenhum produto em estoque nesta loja.</p>
-  {% endif %}
-{% endif %}
-
-{% if lote_selecionado %}
-<div class="card">
+<div class="card mb-4">
   <div class="card-body">
-    <h5 class="card-title">{{ lote_selecionado.produto.nome }} — Lote {{ lote_selecionado.lote|default:"-" }}</h5>
-    <p class="text-muted">Validade: {{ lote_selecionado.validade|date:"d/m/Y" }} | Saldo: {{ lote_selecionado.quantidade }} un em {{ lote_selecionado.loja_atual.nome }}</p>
-
     <form method="post">
       {% csrf_token %}
-      <input type="hidden" name="loja_origem" value="{{ loja_origem.id }}">
-      <input type="hidden" name="lote_id" value="{{ lote_selecionado.id }}">
+      <input type="hidden" name="acao" value="bipar">
       <div class="row g-3">
         <div class="col-12 col-md-6">
-          <label class="form-label">{{ form.loja_destino.label }}</label>
-          {{ form.loja_destino }}
-          {% if form.loja_destino.errors %}<div class="text-danger small">{{ form.loja_destino.errors }}</div>{% endif %}
+          <label class="form-label">{{ cabecalho_form.loja_origem.label }}</label>
+          {{ cabecalho_form.loja_origem }}
         </div>
         <div class="col-12 col-md-6">
-          <label class="form-label">{{ form.quantidade.label }}</label>
-          {{ form.quantidade }}
-          {% if form.quantidade.errors %}<div class="text-danger small">{{ form.quantidade.errors }}</div>{% endif %}
+          <label class="form-label">{{ cabecalho_form.loja_destino.label }}</label>
+          {{ cabecalho_form.loja_destino }}
         </div>
         <div class="col-12">
-          <label class="form-label">{{ form.observacoes.label }}</label>
-          {{ form.observacoes }}
+          <label class="form-label">🔍 {{ cabecalho_form.codigo_barras.label }}</label>
+          {{ cabecalho_form.codigo_barras }}
         </div>
       </div>
-      <button type="submit" class="btn btn-primary mt-3">Confirmar Remanejamento</button>
+      <button type="submit" class="btn btn-primary mt-3">Bipar / Buscar Produto</button>
     </form>
   </div>
+</div>
+
+{% if escolha_pendente %}
+<div class="card mb-4 border-primary">
+  <div class="card-body">
+    <h5 class="card-title">Escolha a validade de: {{ escolha_pendente.produto_nome }}</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Validade</th><th>Disponível</th><th>Quantidade a mover</th><th></th></tr></thead>
+        <tbody>
+        {% for opcao in escolha_pendente.opcoes %}
+          <tr>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="acao" value="escolher_validade">
+              <input type="hidden" name="lote_id" value="{{ opcao.lote_id }}">
+              <td class="align-middle">{{ opcao.validade|date:"d/m/Y" }}</td>
+              <td class="align-middle">{{ opcao.quantidade_disponivel }}</td>
+              <td><input type="number" name="quantidade" class="form-control form-control-sm" min="1" max="{{ opcao.quantidade_disponivel }}" value="{{ opcao.quantidade_disponivel }}" style="max-width: 100px;"></td>
+              <td><button type="submit" class="btn btn-sm btn-primary">Adicionar</button></td>
+            </form>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="cancelar_escolha">
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Cancelar</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if itens %}
+<div class="mb-3">
+  {% for item in itens %}
+  <div class="card mb-2">
+    <div class="card-header">
+      <form method="post" class="mb-0">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="expandir">
+        <input type="hidden" name="idx" value="{{ item.idx }}">
+        <button type="submit" class="btn btn-link text-decoration-none text-start p-0 w-100">
+          {% if item.aberto %}▾{% else %}▸{% endif %}
+          {{ item.produto_nome }} — {{ item.quantidade }}un · val. {{ item.validade|date:"d/m/Y" }}
+        </button>
+      </form>
+    </div>
+    {% if item.aberto %}
+    <div class="card-body">
+      <form method="post" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="atualizar_item">
+        <input type="hidden" name="idx" value="{{ item.idx }}">
+        <div class="col-12 col-md-4">
+          <label class="form-label">Quantidade (disponível: {{ item.quantidade_disponivel }})</label>
+          <input type="number" name="quantidade" class="form-control" min="1" max="{{ item.quantidade_disponivel }}" value="{{ item.quantidade }}">
+        </div>
+        <div class="col-12 col-md-3">
+          <button type="submit" class="btn btn-primary btn-sm">Salvar</button>
+        </div>
+      </form>
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="remover_item">
+        <input type="hidden" name="idx" value="{{ item.idx }}">
+        <button type="submit" class="btn btn-outline-danger btn-sm mt-2">Remover Item</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<div class="d-flex flex-column flex-sm-row gap-2 mb-4">
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="enviar">
+    <button type="submit" class="btn btn-success">Confirmar Remanejamento ({{ total_itens }} iten{{ total_itens|pluralize:"s" }})</button>
+  </form>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="cancelar">
+    <button type="submit" class="btn btn-outline-secondary">Cancelar</button>
+  </form>
 </div>
 {% endif %}
 {% endblock %}

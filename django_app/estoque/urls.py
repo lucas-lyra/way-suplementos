@@ -11,8 +11,11 @@ urlpatterns = [
     path("cadastro/", views.cadastro, name="cadastro"),
 
     path("", views.recebimento, name="recebimento"),
-    path("remanejamento/", views.remanejamento, name="remanejamento"),
-    path("planilha/", views.planilha, name="planilha"),
     path("pendencias/", views.pendencias, name="pendencias"),
+    path("remanejamento/", views.remanejamento, name="remanejamento"),
+    path("rotas/nova/", views.rotas_criar, name="rotas_criar"),
+    path("rotas/", views.rotas_painel, name="rotas_painel"),
+    path("planilha/", views.planilha, name="planilha"),
+    path("lojas/", views.lojas, name="lojas"),
     path("usuarios/", views.usuarios, name="usuarios"),
 ]
