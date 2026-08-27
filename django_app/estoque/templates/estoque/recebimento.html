@@ -1,127 +1,170 @@
 {% extends "estoque/base.html" %}
 {% block title %}Recebimento — Way Suplementos{% endblock %}
 {% block content %}
-<h1 class="h3 mb-4">📥 Recebimento de Mercadoria</h1>
+<h1 class="h3 mb-4">📥 Recebimento por Nota Fiscal</h1>
 
 {% if perfil_cd %}
 <div class="alert alert-info">
-  Sua entrada será registrada como <strong>pendente</strong> — só conta como estoque disponível depois de aprovada
+  Sua NF será registrada como <strong>pendente</strong> — só conta como estoque disponível depois de aprovada
   pela Compra e Venda ou pelo Coordenador.
 </div>
 {% endif %}
 
 <div class="card mb-4">
   <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-12 col-md-8">
-        <label class="form-label">Código de Barras</label>
-        <input type="text" name="codigo_barras" class="form-control form-control-lg" autofocus autocomplete="off"
-               placeholder="Bipe ou digite o código..." value="{{ codigo_barras }}">
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="bipar">
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label">{{ cabecalho_form.numero.label }}</label>
+          {{ cabecalho_form.numero }}
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">{{ cabecalho_form.fornecedor.label }}</label>
+          {{ cabecalho_form.fornecedor }}
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">{{ cabecalho_form.loja_destino.label }}</label>
+          {{ cabecalho_form.loja_destino }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">🔍 {{ cabecalho_form.codigo_barras.label }}</label>
+          {{ cabecalho_form.codigo_barras }}
+        </div>
       </div>
-      <div class="col-12 col-md-4">
-        <button type="submit" class="btn btn-primary w-100">Buscar</button>
-      </div>
+      <button type="submit" class="btn btn-primary mt-3">Bipar / Adicionar Item</button>
     </form>
   </div>
 </div>
 
-{% if codigo_barras %}
-  {% if produto %}
-    <div class="alert alert-success">
-      Produto reconhecido: <strong>{{ produto.nome }}</strong>
-      {% if produto.marca %}<span class="text-muted">({{ produto.marca }})</span>{% endif %}
+{% if itens %}
+<div class="mb-3">
+  {% for item in itens %}
+  <div class="card mb-2">
+    <div class="card-header d-flex justify-content-between align-items-center" style="cursor: pointer;">
+      <form method="post" class="flex-grow-1 mb-0">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="expandir">
+        <input type="hidden" name="idx" value="{{ item.idx }}">
+        <button type="submit" class="btn btn-link text-decoration-none text-start p-0 w-100">
+          {% if item.aberto %}▾{% else %}▸{% endif %}
+          {{ item.produto_nome|default:"(produto não identificado)" }}
+          — {{ item.quantidade }}un · val. {{ item.validade|date:"d/m/Y" }}
+          {% if item.novo_cadastro %}<span class="badge bg-warning text-dark ms-2">novo cadastro</span>
+          {% else %}<span class="badge bg-success ms-2">produto já cadastrado</span>{% endif %}
+        </button>
+      </form>
     </div>
-  {% else %}
-    <div class="alert alert-warning">Código não encontrado no catálogo. Preencha a ficha abaixo para o primeiro cadastro.</div>
-  {% endif %}
 
-  <form method="post" class="card card-body mb-4">
-    {% csrf_token %}
-    <input type="hidden" name="codigo_barras" value="{{ codigo_barras }}">
-    <div class="row g-3">
-      {% if not produto %}
-      <div class="col-12 col-md-6">
-        <label class="form-label">{{ form.nome.label }}</label>
-        {{ form.nome }}
-      </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">{{ form.marca.label }}</label>
-        {{ form.marca }}
-      </div>
-      {% endif %}
-      <div class="col-12 col-md-6">
-        <label class="form-label">{{ form.lote.label }}</label>
-        {{ form.lote }}
-      </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">{{ form.validade.label }}</label>
-        {{ form.validade }}
-        {% if form.validade.errors %}<div class="text-danger small">{{ form.validade.errors }}</div>{% endif %}
-      </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">{{ form.quantidade.label }}</label>
-        {{ form.quantidade }}
-        {% if form.quantidade.errors %}<div class="text-danger small">{{ form.quantidade.errors }}</div>{% endif %}
-      </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">{{ form.loja_destino.label }}</label>
-        {{ form.loja_destino }}
-      </div>
-      <div class="col-12">
-        <label class="form-label">{{ form.observacoes.label }}</label>
-        {{ form.observacoes }}
-      </div>
+    {% if item.aberto %}
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="atualizar_item">
+        <input type="hidden" name="idx" value="{{ item.idx }}">
+        <div class="row g-3">
+          {% if item.novo_cadastro %}
+          <div class="col-12 col-md-6">
+            <label class="form-label">Nome do Produto</label>
+            <input type="text" name="nome" class="form-control" value="{{ item.produto_nome|default:'' }}" required>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label">Marca</label>
+            <input type="text" name="marca" class="form-control" value="{{ item.marca|default:'' }}">
+          </div>
+          {% endif %}
+          <div class="col-12 col-md-4">
+            <label class="form-label">Validade</label>
+            <input type="date" name="validade" class="form-control" value="{{ item.validade }}" required>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Quantidade</label>
+            <input type="number" name="quantidade" class="form-control" min="1" value="{{ item.quantidade }}" required>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Observação (opcional)</label>
+            <input type="text" name="observacao" class="form-control" value="{{ item.observacao|default:'' }}">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm mt-3">Salvar Item</button>
+      </form>
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="remover_item">
+        <input type="hidden" name="idx" value="{{ item.idx }}">
+        <button type="submit" class="btn btn-outline-danger btn-sm mt-3">Remover Item</button>
+      </form>
     </div>
-    <button type="submit" class="btn btn-primary mt-3">
-      {% if produto %}Confirmar Entrada{% else %}Salvar Ficha e Dar Entrada{% endif %}
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<div class="d-flex flex-column flex-sm-row gap-2 mb-4">
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="enviar">
+    <button type="submit" class="btn btn-success">
+      {% if perfil_cd %}Enviar para aprovação{% else %}Confirmar Entrada{% endif %} ({{ total_itens }} iten{{ total_itens|pluralize:"s" }})
     </button>
   </form>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="cancelar">
+    <button type="submit" class="btn btn-outline-secondary">Cancelar Recebimento</button>
+  </form>
+</div>
 {% endif %}
 
 <hr class="my-4">
 
 {% if perfil_cd %}
-  <h2 class="h5 mb-3">Minhas Entradas Recentes</h2>
-  {% if minhas_entradas %}
+  <h2 class="h5 mb-3">Minhas Notas Fiscais Recentes</h2>
+  {% if minhas_notas %}
   <div class="table-responsive">
     <table class="table table-sm table-striped align-middle">
-      <thead><tr><th>Situação</th><th>Produto</th><th>Lote</th><th>Qtd</th><th>Loja</th><th>Lançado em</th><th>Motivo</th></tr></thead>
+      <thead><tr><th>NF</th><th>Loja</th><th>Situação</th><th>Itens</th><th>Recebido em</th></tr></thead>
       <tbody>
-      {% for lote in minhas_entradas %}
+      {% for nf in minhas_notas %}
         <tr>
+          <td>{{ nf.numero }}{% if nf.fornecedor %} — {{ nf.fornecedor }}{% endif %}</td>
+          <td>{{ nf.loja_destino.nome }}</td>
           <td>
-            {% if lote.status == "aguardando_aprovacao" %}
-              <span class="badge bg-warning text-dark">Pendente</span>
-            {% else %}
-              <span class="badge bg-danger">Rejeitado</span>
-            {% endif %}
+            {% if nf.status == "pendente" %}<span class="badge bg-warning text-dark">Pendente</span>
+            {% elif nf.status == "aprovado" %}<span class="badge bg-success">Aprovado</span>
+            {% else %}<span class="badge bg-danger">Rejeitado</span>{% endif %}
           </td>
-          <td>{{ lote.produto.nome }}</td>
-          <td>{{ lote.lote|default:"-" }}</td>
-          <td>{{ lote.quantidade }}</td>
-          <td>{{ lote.loja_atual.nome }}</td>
-          <td>{{ lote.criado_em|date:"d/m/Y H:i" }}</td>
-          <td>{{ lote.motivo_rejeicao|default:"-" }}</td>
+          <td>
+            {% for item in nf.itens.all %}
+              <div>
+                {{ item.produto.nome }} ({{ item.quantidade }}un)
+                {% if item.status == "pendente" %}<span class="badge bg-warning text-dark">pendente</span>
+                {% elif item.status == "aprovado" %}<span class="badge bg-success">aprovado</span>
+                {% else %}<span class="badge bg-danger" title="{{ item.motivo_rejeicao }}">rejeitado</span>{% endif %}
+              </div>
+            {% endfor %}
+          </td>
+          <td>{{ nf.data_recebimento|date:"d/m/Y H:i" }}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
   {% else %}
-    <p class="text-muted">Nenhuma entrada pendente ou rejeitada — tudo que você lançou já foi aprovado.</p>
+    <p class="text-muted">Nenhuma nota fiscal lançada ainda.</p>
   {% endif %}
 {% else %}
   <h2 class="h5 mb-3">Estoque Consolidado</h2>
   {% if estoque_consolidado %}
   <div class="table-responsive">
     <table class="table table-sm table-striped align-middle">
-      <thead><tr><th>Produto</th><th>Marca</th><th>Lote</th><th>Validade</th><th>Qtd</th><th>Loja</th></tr></thead>
+      <thead><tr><th>Produto</th><th>Marca</th><th>Validade</th><th>Qtd</th><th>Loja</th></tr></thead>
       <tbody>
       {% for lote in estoque_consolidado %}
         <tr>
           <td>{{ lote.produto.nome }}</td>
           <td>{{ lote.produto.marca|default:"-" }}</td>
-          <td>{{ lote.lote|default:"-" }}</td>
           <td>{{ lote.validade|date:"d/m/Y" }}</td>
           <td>{{ lote.quantidade }}</td>
           <td>{{ lote.loja_atual.nome }}</td>

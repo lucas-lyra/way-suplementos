@@ -2,44 +2,89 @@
 {% block title %}Pendências de Aprovação — Way Suplementos{% endblock %}
 {% block content %}
 <h1 class="h3 mb-4">⏳ Pendências de Aprovação</h1>
-<p class="text-muted">Lançamentos do CD aguardando validação. Só depois de aprovados entram na Planilha Compartilhada.</p>
+<p class="text-muted">Notas fiscais lançadas pelo perfil CD aguardando validação. Só depois de aprovados, os itens contam como estoque disponível na Planilha Compartilhada.</p>
 
-{% if pendentes %}
-  {% for lote in pendentes %}
+{% if notas_pendentes %}
+  {% for nf in notas_pendentes %}
   <div class="card mb-3">
     <div class="card-body">
-      <h5 class="card-title mb-1">{{ lote.produto.nome }} <small class="text-muted">({{ lote.produto.marca|default:"-" }})</small></h5>
-      <p class="card-text mb-1">Lote: <strong>{{ lote.lote|default:"-" }}</strong> &nbsp;|&nbsp; Validade: <strong>{{ lote.validade|date:"d/m/Y" }}</strong></p>
-      <p class="card-text mb-1">Quantidade: <strong>{{ lote.quantidade }} un</strong> &nbsp;|&nbsp; Destino: <strong>{{ lote.loja_atual.nome }}</strong></p>
-      <p class="card-text text-muted small mb-3">Lançado por {{ lote.criado_por }} em {{ lote.criado_em|date:"d/m/Y H:i" }}</p>
+      <h5 class="card-title mb-1">NF {{ nf.numero }}{% if nf.fornecedor %} — {{ nf.fornecedor }}{% endif %}</h5>
+      <p class="card-text mb-3 text-muted small">
+        Destino: <strong>{{ nf.loja_destino.nome }}</strong> |
+        Lançado por <strong>{{ nf.responsavel.username }}</strong> em {{ nf.data_recebimento|date:"d/m/Y H:i" }}
+      </p>
+
+      <div class="table-responsive mb-3">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Produto</th><th>Validade</th><th>Qtd</th><th>Observação</th><th>Situação</th><th></th></tr></thead>
+          <tbody>
+          {% for item in nf.itens.all %}
+            <tr>
+              <td>{{ item.produto.nome }} <span class="text-muted">({{ item.produto.marca|default:"-" }})</span></td>
+              <td>{{ item.validade|date:"d/m/Y" }}</td>
+              <td>{{ item.quantidade }}</td>
+              <td>{{ item.observacao|default:"-" }}</td>
+              <td>
+                {% if item.status == "pendente" %}<span class="badge bg-warning text-dark">Pendente</span>
+                {% elif item.status == "aprovado" %}<span class="badge bg-success">Aprovado</span>
+                {% else %}<span class="badge bg-danger">Rejeitado</span>{% endif %}
+              </td>
+              <td>
+                {% if item.status == "pendente" %}
+                <div class="d-flex gap-1">
+                  <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="aprovar_item">
+                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                    <button type="submit" class="btn btn-sm btn-success">Aprovar</button>
+                  </form>
+                  <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#rejeitar-item-{{ item.id }}">
+                    Rejeitar
+                  </button>
+                </div>
+                <div class="collapse mt-2" id="rejeitar-item-{{ item.id }}">
+                  <form method="post" class="d-flex gap-1">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="rejeitar_item">
+                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                    <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Motivo..." required>
+                    <button type="submit" class="btn btn-sm btn-danger">Confirmar</button>
+                  </form>
+                </div>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
 
       <div class="d-flex flex-column flex-sm-row gap-2">
         <form method="post">
           {% csrf_token %}
-          <input type="hidden" name="lote_id" value="{{ lote.id }}">
-          <input type="hidden" name="acao" value="aprovar">
-          <button type="submit" class="btn btn-success">Aprovar</button>
+          <input type="hidden" name="acao" value="aprovar_nf">
+          <input type="hidden" name="nf_id" value="{{ nf.id }}">
+          <button type="submit" class="btn btn-success">Aprovar NF Inteira</button>
         </form>
-        <button class="btn btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#rejeitar-{{ lote.id }}">
-          Rejeitar
+        <button class="btn btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#rejeitar-nf-{{ nf.id }}">
+          Rejeitar NF Inteira
         </button>
       </div>
-
-      <div class="collapse mt-3" id="rejeitar-{{ lote.id }}">
+      <div class="collapse mt-3" id="rejeitar-nf-{{ nf.id }}">
         <form method="post">
           {% csrf_token %}
-          <input type="hidden" name="lote_id" value="{{ lote.id }}">
-          <input type="hidden" name="acao" value="rejeitar">
+          <input type="hidden" name="acao" value="rejeitar_nf">
+          <input type="hidden" name="nf_id" value="{{ nf.id }}">
           <div class="mb-2">
-            <textarea name="motivo" class="form-control" rows="2" placeholder="Motivo da rejeição (ex: quantidade errada, validade ilegível...)" required></textarea>
+            <textarea name="motivo" class="form-control" rows="2" placeholder="Motivo da rejeição (aplica a todos os itens ainda pendentes desta NF)..." required></textarea>
           </div>
-          <button type="submit" class="btn btn-danger btn-sm">Confirmar Rejeição</button>
+          <button type="submit" class="btn btn-danger btn-sm">Confirmar Rejeição da NF Inteira</button>
         </form>
       </div>
     </div>
   </div>
   {% endfor %}
 {% else %}
-  <p class="text-muted">Nenhuma entrada pendente de aprovação no momento.</p>
+  <p class="text-muted">Nenhuma nota fiscal pendente de aprovação no momento.</p>
 {% endif %}
 {% endblock %}

@@ -2,6 +2,7 @@ from datetime import date
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 # Status compartilhado por Lote e Movimentacao. O valor gravado no banco é
@@ -9,6 +10,15 @@ from django.db import models
 # label exibido na interface é "Pendente".
 STATUS_CHOICES = [
     ("aguardando_aprovacao", "Pendente"),
+    ("aprovado", "Aprovado"),
+    ("rejeitado", "Rejeitado"),
+]
+
+# Status de NotaFiscal/ItemNotaFiscal — tabelas novas (sem CHECK CONSTRAINT
+# legado pra respeitar), então usa o valor literal 'pendente' do briefing em
+# vez de 'aguardando_aprovacao'.
+STATUS_NF_CHOICES = [
+    ("pendente", "Pendente"),
     ("aprovado", "Aprovado"),
     ("rejeitado", "Rejeitado"),
 ]
@@ -130,3 +140,75 @@ class Movimentacao(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_display()} — {self.lote} ({self.quantidade} un)"
+
+
+class NotaFiscal(models.Model):
+    """Recebimento por nota fiscal: agrupa vários itens (produtos) bipados de
+    uma vez. Tabela NOVA (managed=True — Django cria/gerencia via migration,
+    diferente de produtos/lojas/lotes/movimentacoes). Sem campo de lote — a
+    rastreabilidade/FEFO de cada item vira um Lote com lote=None, agrupado só
+    por produto+validade+loja (mesmo mecanismo que já existia para entradas
+    sem número de lote informado)."""
+    numero = models.CharField("Número da NF", max_length=50)
+    fornecedor = models.CharField(max_length=255, blank=True, null=True)
+    loja_destino = models.ForeignKey(Loja, on_delete=models.PROTECT, db_column="loja_destino_id", related_name="notas_fiscais")
+    data_recebimento = models.DateTimeField(default=timezone.now)
+    responsavel = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="notas_fiscais"
+    )  # sempre o usuário logado que criou a NF — nunca texto livre.
+    status = models.CharField(max_length=20, choices=STATUS_NF_CHOICES, default="pendente")
+    aprovado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="notas_fiscais_decididas"
+    )
+    aprovado_em = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = "notas_fiscais"
+        ordering = ["-data_recebimento"]
+
+    def __str__(self):
+        return f"NF {self.numero} — {self.loja_destino}"
+
+    def recalcular_status(self):
+        """Recalcula o status da NF a partir dos itens: fica 'pendente' enquanto
+        sobrar item pendente; vira 'aprovado' quando os itens restantes forem
+        todos aprovados; 'rejeitado' só se todos os itens forem rejeitados.
+        Chamado depois de qualquer aprovação/rejeição de item."""
+        status_itens = list(self.itens.values_list("status", flat=True))
+        if not status_itens or any(s == "pendente" for s in status_itens):
+            novo_status = "pendente"
+        elif any(s == "aprovado" for s in status_itens):
+            novo_status = "aprovado"
+        else:
+            novo_status = "rejeitado"
+        if novo_status != self.status:
+            self.status = novo_status
+            self.save(update_fields=["status"])
+
+
+class ItemNotaFiscal(models.Model):
+    """Um produto dentro de uma NotaFiscal. Sem campo de lote (ver docstring de
+    NotaFiscal). `status`/`motivo_rejeicao` não estavam no modelo original do
+    briefing, mas são necessários para aprovar/rejeitar item por item (pedido
+    explicitamente no fluxo) — sem isso não dá pra saber quais itens de uma NF
+    já foram decididos."""
+    nota_fiscal = models.ForeignKey(NotaFiscal, on_delete=models.CASCADE, related_name="itens")
+    produto = models.ForeignKey(Produto, on_delete=models.PROTECT, db_column="produto_id", related_name="itens_nota_fiscal")
+    validade = models.DateField()
+    quantidade = models.PositiveIntegerField()
+    observacao = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_NF_CHOICES, default="pendente")
+    motivo_rejeicao = models.TextField(blank=True, null=True)
+    # Rastreabilidade: qual Lote este item originou quando foi aprovado.
+    lote_gerado = models.ForeignKey(
+        Lote, on_delete=models.SET_NULL, db_column="lote_gerado_id", null=True, blank=True,
+        related_name="itens_nota_fiscal_origem"
+    )
+
+    class Meta:
+        db_table = "itens_nota_fiscal"
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.produto} — {self.quantidade} un (NF {self.nota_fiscal.numero})"
