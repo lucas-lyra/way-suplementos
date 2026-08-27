@@ -44,7 +44,7 @@
         <td class="small">
           {% if origem %}
             NF {{ origem.nota_fiscal.numero }}<br>
-            <span class="text-muted">Recebido por {{ origem.nota_fiscal.responsavel.username }}</span>
+            <span class="text-muted">Recebido por {{ origem.nota_fiscal.responsavel.username }} em {{ origem.nota_fiscal.data_recebimento|date:"d/m/Y H:i" }}</span>
           {% else %}
             <span class="text-muted">-</span>
           {% endif %}

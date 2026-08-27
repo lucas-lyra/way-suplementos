@@ -2,7 +2,6 @@ from datetime import date, datetime
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
@@ -165,12 +164,13 @@ def _rejeitar_item_nf(item, motivo):
     item.nota_fiscal.recalcular_status()
 
 
-@login_required
+@perfil_required(GRUPO_CD, *GRUPOS_ACESSO_TOTAL)
 def recebimento(request):
     """Tela de Recebimento por Nota Fiscal (checklist de itens bipados, sem
-    campo de lote). Perfil 'cd' (sem acesso total): a NF nasce pendente, item
-    por item. Perfis com acesso total: a NF já nasce aprovada (cada item vira
-    estoque disponível na hora), e a tela também mostra o estoque consolidado."""
+    campo de lote). Restrita a CD e acesso total — motorista não deve entrar
+    aqui (nem por link, nem por URL direta). Perfil 'cd': a NF nasce pendente,
+    item por item. Perfis com acesso total: a NF já nasce aprovada (cada item
+    vira estoque disponível na hora)."""
     perfil_cd = em_grupo(request.user, GRUPO_CD) and not tem_acesso_total(request.user)
     status_entrada = "pendente" if perfil_cd else "aprovado"
 
@@ -321,19 +321,15 @@ def recebimento(request):
         "total_itens": len(itens_exibicao),
     }
 
-    if perfil_cd:
-        contexto["minhas_notas"] = (
-            NotaFiscal.objects.filter(responsavel=request.user)
-            .select_related("loja_destino")
-            .prefetch_related("itens__produto")
-            .order_by("-data_recebimento")[:10]
-        )
-    else:
-        contexto["estoque_consolidado"] = (
-            Lote.objects.filter(status="aprovado", quantidade__gt=0)
-            .select_related("produto", "loja_atual")
-            .order_by("produto__nome", "validade")
-        )
+    # A planilha de estoque geral é uma seção própria ("Estoque" no menu) —
+    # não aparece aqui. O que faz sentido nesta tela é o histórico do que a
+    # própria pessoa lançou (pendente/aprovado/rejeitado), não o estoque todo.
+    contexto["minhas_notas"] = (
+        NotaFiscal.objects.filter(responsavel=request.user)
+        .select_related("loja_destino")
+        .prefetch_related("itens__produto")
+        .order_by("-data_recebimento")[:10]
+    )
 
     return render(request, "estoque/recebimento.html", contexto)
 

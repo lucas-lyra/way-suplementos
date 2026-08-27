@@ -119,62 +119,38 @@
 
 <hr class="my-4">
 
-{% if perfil_cd %}
-  <h2 class="h5 mb-3">Minhas Notas Fiscais Recentes</h2>
-  {% if minhas_notas %}
-  <div class="table-responsive">
-    <table class="table table-sm table-striped align-middle">
-      <thead><tr><th>NF</th><th>Loja</th><th>Situação</th><th>Itens</th><th>Recebido em</th></tr></thead>
-      <tbody>
-      {% for nf in minhas_notas %}
-        <tr>
-          <td>{{ nf.numero }}{% if nf.fornecedor %} — {{ nf.fornecedor }}{% endif %}</td>
-          <td>{{ nf.loja_destino.nome }}</td>
-          <td>
-            {% if nf.status == "pendente" %}<span class="badge bg-warning text-dark">Pendente</span>
-            {% elif nf.status == "aprovado" %}<span class="badge bg-success">Aprovado</span>
-            {% else %}<span class="badge bg-danger">Rejeitado</span>{% endif %}
-          </td>
-          <td>
-            {% for item in nf.itens.all %}
-              <div>
-                {{ item.produto.nome }} ({{ item.quantidade }}un)
-                {% if item.status == "pendente" %}<span class="badge bg-warning text-dark">pendente</span>
-                {% elif item.status == "aprovado" %}<span class="badge bg-success">aprovado</span>
-                {% else %}<span class="badge bg-danger" title="{{ item.motivo_rejeicao }}">rejeitado</span>{% endif %}
-              </div>
-            {% endfor %}
-          </td>
-          <td>{{ nf.data_recebimento|date:"d/m/Y H:i" }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-    <p class="text-muted">Nenhuma nota fiscal lançada ainda.</p>
-  {% endif %}
+<h2 class="h5 mb-3">Minhas Notas Fiscais Recentes</h2>
+{% if minhas_notas %}
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead><tr><th>NF</th><th>Loja</th><th>Situação</th><th>Itens</th><th>Recebido em</th></tr></thead>
+    <tbody>
+    {% for nf in minhas_notas %}
+      <tr>
+        <td>{{ nf.numero }}{% if nf.fornecedor %} — {{ nf.fornecedor }}{% endif %}</td>
+        <td>{{ nf.loja_destino.nome }}</td>
+        <td>
+          {% if nf.status == "pendente" %}<span class="badge bg-warning text-dark">Pendente</span>
+          {% elif nf.status == "aprovado" %}<span class="badge bg-success">Aprovado</span>
+          {% else %}<span class="badge bg-danger">Rejeitado</span>{% endif %}
+        </td>
+        <td>
+          {% for item in nf.itens.all %}
+            <div>
+              {{ item.produto.nome }} ({{ item.quantidade }}un)
+              {% if item.status == "pendente" %}<span class="badge bg-warning text-dark">pendente</span>
+              {% elif item.status == "aprovado" %}<span class="badge bg-success">aprovado</span>
+              {% else %}<span class="badge bg-danger" title="{{ item.motivo_rejeicao }}">rejeitado</span>{% endif %}
+            </div>
+          {% endfor %}
+        </td>
+        <td>{{ nf.data_recebimento|date:"d/m/Y H:i" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% else %}
-  <h2 class="h5 mb-3">Estoque Consolidado</h2>
-  {% if estoque_consolidado %}
-  <div class="table-responsive">
-    <table class="table table-sm table-striped align-middle">
-      <thead><tr><th>Produto</th><th>Marca</th><th>Validade</th><th>Qtd</th><th>Loja</th></tr></thead>
-      <tbody>
-      {% for lote in estoque_consolidado %}
-        <tr>
-          <td>{{ lote.produto.nome }}</td>
-          <td>{{ lote.produto.marca|default:"-" }}</td>
-          <td>{{ lote.validade|date:"d/m/Y" }}</td>
-          <td>{{ lote.quantidade }}</td>
-          <td>{{ lote.loja_atual.nome }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-    <p class="text-muted">Nenhum produto em estoque no momento.</p>
-  {% endif %}
+  <p class="text-muted">Nenhuma nota fiscal lançada ainda.</p>
 {% endif %}
 {% endblock %}
