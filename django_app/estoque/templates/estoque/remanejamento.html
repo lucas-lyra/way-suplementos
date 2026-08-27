@@ -1,0 +1,74 @@
+{% extends "estoque/base.html" %}
+{% block title %}Remanejamento — Way Suplementos{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">🔁 Remanejamento entre Lojas</h1>
+
+<form method="get" class="row g-2 align-items-end mb-4">
+  <div class="col-12 col-md-8">
+    <label class="form-label">Loja de Origem</label>
+    <select name="loja_origem" class="form-select" onchange="this.form.submit()">
+      <option value="">Selecione...</option>
+      {% for loja in lojas %}
+        <option value="{{ loja.id }}" {% if loja_origem and loja.id == loja_origem.id %}selected{% endif %}>{{ loja.nome }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+{% if loja_origem %}
+  {% if lotes_origem %}
+  <div class="table-responsive mb-4">
+    <table class="table table-sm table-striped align-middle">
+      <thead><tr><th>Produto</th><th>Lote</th><th>Validade</th><th>Qtd</th><th></th></tr></thead>
+      <tbody>
+      {% for lote in lotes_origem %}
+        <tr class="{% if lote_selecionado and lote.id == lote_selecionado.id %}table-primary{% endif %}">
+          <td>{{ lote.produto.nome }}</td>
+          <td>{{ lote.lote|default:"-" }}</td>
+          <td>{{ lote.validade|date:"d/m/Y" }}</td>
+          <td>{{ lote.quantidade }}</td>
+          <td>
+            <a href="?loja_origem={{ loja_origem.id }}&amp;lote_id={{ lote.id }}" class="btn btn-sm btn-outline-primary">Selecionar</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="text-muted">Nenhum produto em estoque nesta loja.</p>
+  {% endif %}
+{% endif %}
+
+{% if lote_selecionado %}
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">{{ lote_selecionado.produto.nome }} — Lote {{ lote_selecionado.lote|default:"-" }}</h5>
+    <p class="text-muted">Validade: {{ lote_selecionado.validade|date:"d/m/Y" }} | Saldo: {{ lote_selecionado.quantidade }} un em {{ lote_selecionado.loja_atual.nome }}</p>
+
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="loja_origem" value="{{ loja_origem.id }}">
+      <input type="hidden" name="lote_id" value="{{ lote_selecionado.id }}">
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label">{{ form.loja_destino.label }}</label>
+          {{ form.loja_destino }}
+          {% if form.loja_destino.errors %}<div class="text-danger small">{{ form.loja_destino.errors }}</div>{% endif %}
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">{{ form.quantidade.label }}</label>
+          {{ form.quantidade }}
+          {% if form.quantidade.errors %}<div class="text-danger small">{{ form.quantidade.errors }}</div>{% endif %}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.observacoes.label }}</label>
+          {{ form.observacoes }}
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary mt-3">Confirmar Remanejamento</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

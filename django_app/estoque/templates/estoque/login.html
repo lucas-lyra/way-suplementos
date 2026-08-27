@@ -1,0 +1,34 @@
+{% extends "estoque/base.html" %}
+{% block title %}Login — Way Suplementos{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card shadow-sm mt-5">
+      <div class="card-body p-4">
+        <h1 class="h4 mb-4 text-center">🔒 Way Suplementos</h1>
+
+        {% if form.errors %}
+          <div class="alert alert-danger">Usuário ou senha incorretos.</div>
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="id_username" class="form-label">Usuário</label>
+            <input type="text" name="username" id="id_username" class="form-control" autofocus required>
+          </div>
+          <div class="mb-3">
+            <label for="id_password" class="form-label">Senha</label>
+            <input type="password" name="password" id="id_password" class="form-control" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Entrar</button>
+        </form>
+
+        <p class="text-center small mt-3 mb-0">
+          <a href="{% url 'estoque:cadastro' %}">Não tenho conta — criar uma</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

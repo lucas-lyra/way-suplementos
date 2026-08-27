@@ -2,10 +2,11 @@
 -- Way Suplementos — Schema: Controle de Estoque (Lote/Validade + Remanejamento)
 -- Execute este script no SQL Editor do Supabase.
 --
--- Este módulo SUBSTITUI o schema antigo (produtos com validade inline, filiais,
--- envios_lojas). As tabelas antigas NÃO são apagadas por este script — elas ficam
--- intactas caso você precise consultar/migrar dados manualmente depois. O app.py
--- atualizado não lê mais delas.
+-- Estas tabelas (produtos/lojas/lotes/movimentacoes/perdas) são as usadas hoje
+-- pelo sistema em django_app/ (models com managed=False, ver estoque/models.py
+-- lá dentro). Este módulo substituiu um schema ainda mais antigo (produtos com
+-- validade inline, filiais, envios_lojas) — essas tabelas antigas não são
+-- apagadas por este script e podem ainda existir órfãs no banco.
 -- ============================================================================
 
 -- 1. Catálogo de produtos (sem validade/lote — isso agora vive em "lotes")
@@ -105,17 +106,17 @@ CREATE TABLE IF NOT EXISTS perdas (
 --  constraint manualmente apontando para "lojas", depois de migrar os dados de
 --  "filiais" para "lojas".)
 
--- 6. Usuários: perfil e liberação de acesso de cada conta de login.
--- O "id" é o MESMO id da conta em auth.users (Supabase Auth) — ou seja, essa
--- linha não cria a conta de login; ela só guarda o perfil/permissão de uma
--- conta que você já criou manualmente em Authentication > Users no painel do
--- Supabase. O app cria a linha aqui sozinho no primeiro login de cada pessoa
--- (com perfil nulo e ativo=false, travada até um admin liberar) — EXCETO o
--- primeiríssimo login do sistema inteiro, que vira admin automaticamente
--- (bootstrap, para ter alguém que possa liberar os demais).
+-- 6. Usuários (ÓRFÃ / SEM USO ATUAL): perfil e liberação de acesso de cada
+-- conta de login via Supabase Auth. Era usada pela versão anterior em
+-- Streamlit, já removida do repositório. O sistema atual (django_app/) usa as
+-- tabelas próprias do Django (auth_user, auth_group) para perfil/login, não
+-- esta tabela. Mantida aqui só como registro histórico; a linha continua a
+-- existir no banco (dados não foram apagados), mas nada mais escreve nela.
 --
--- Perfis: 'cd' (só lança recebimento, fica pendente), 'compra_venda' (acesso
--- total + aprova/rejeita), 'admin' (acesso total + gestão de usuários).
+-- Perfis daquela versão: 'cd' (só lança recebimento, fica pendente),
+-- 'compra_venda' (acesso total + aprova/rejeita), 'admin' (acesso total +
+-- gestão de usuários) — mesmo desenho de perfis foi recriado no Django como
+-- Grupos "CD" / "Compra e Venda" / "Coordenador/Admin".
 CREATE TABLE IF NOT EXISTS usuarios (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     apelido TEXT UNIQUE NOT NULL,

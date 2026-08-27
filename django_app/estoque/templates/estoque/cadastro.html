@@ -1,0 +1,45 @@
+{% extends "estoque/base.html" %}
+{% block title %}Criar Conta — Way Suplementos{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card shadow-sm mt-5">
+      <div class="card-body p-4">
+        <h1 class="h4 mb-3 text-center">📝 Criar Conta</h1>
+        <p class="text-muted small text-center mb-4">
+          Se você for a primeira pessoa a se cadastrar no sistema, sua conta já entra como
+          <strong>administrador</strong>. Cadastros seguintes ficam travados até um admin liberar o acesso.
+        </p>
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="{{ form.username.id_for_label }}" class="form-label">Usuário</label>
+            {{ form.username }}
+            {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label for="{{ form.password1.id_for_label }}" class="form-label">Senha</label>
+            {{ form.password1 }}
+            {% if form.password1.errors %}<div class="text-danger small">{{ form.password1.errors }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label for="{{ form.password2.id_for_label }}" class="form-label">Confirmar Senha</label>
+            {{ form.password2 }}
+            {% if form.password2.errors %}<div class="text-danger small">{{ form.password2.errors }}</div>{% endif %}
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Criar Conta</button>
+        </form>
+
+        <p class="text-center small mt-3 mb-0">
+          <a href="{% url 'estoque:login' %}">Já tenho conta — entrar</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

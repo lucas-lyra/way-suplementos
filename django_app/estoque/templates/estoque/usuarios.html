@@ -1,0 +1,58 @@
+{% extends "estoque/base.html" %}
+{% block title %}Gestão de Usuários — Way Suplementos{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">👥 Gestão de Usuários</h1>
+<p class="text-muted">
+  A conta de login (usuário/senha) é criada pelo <a href="/admin/auth/user/add/">Django Admin</a> ou via
+  <code>python manage.py createsuperuser</code>. Aqui você só define o perfil e libera/bloqueia o acesso de cada conta.
+</p>
+
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead><tr><th>Usuário</th><th>Perfil</th><th>Ativo</th><th></th></tr></thead>
+    <tbody>
+    {% for usuario in usuarios_lista %}
+      <tr>
+        <td>{{ usuario.username }}</td>
+        <td>
+          {% for g in usuario.groups.all %}<span class="badge bg-secondary">{{ g.name }}</span>{% empty %}<span class="text-muted">(sem perfil)</span>{% endfor %}
+        </td>
+        <td>
+          {% if usuario.is_active %}<span class="badge bg-success">Sim</span>{% else %}<span class="badge bg-danger">Não</span>{% endif %}
+        </td>
+        <td>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editar-{{ usuario.id }}">
+            Editar
+          </button>
+        </td>
+      </tr>
+      <tr class="collapse" id="editar-{{ usuario.id }}">
+        <td colspan="4">
+          <form method="post" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="user_id" value="{{ usuario.id }}">
+            <div class="col-12 col-md-5">
+              <label class="form-label">Perfil</label>
+              <select name="grupo" class="form-select">
+                {% for grupo in todos_grupos %}
+                  <option value="{{ grupo.id }}" {% if grupo in usuario.groups.all %}selected{% endif %}>{{ grupo.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="form-check">
+                <input type="checkbox" name="ativo" class="form-check-input" id="ativo-{{ usuario.id }}" {% if usuario.is_active %}checked{% endif %}>
+                <label class="form-check-label" for="ativo-{{ usuario.id }}">Conta ativa</label>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <button type="submit" class="btn btn-primary w-100">Salvar</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

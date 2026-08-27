@@ -1,0 +1,53 @@
+{% extends "estoque/base.html" %}
+{% block title %}Planilha Compartilhada — Way Suplementos{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">📋 Planilha Compartilhada de Estoque</h1>
+<p class="text-muted">Ordenada por validade (FEFO) — o que vence primeiro aparece primeiro. Só estoque já aprovado.</p>
+
+<form method="get" class="row g-2 mb-4">
+  <div class="col-12 col-md-4">
+    <select name="loja" class="form-select" onchange="this.form.submit()">
+      <option value="">Todas as lojas</option>
+      {% for loja in lojas %}
+        <option value="{{ loja.id }}" {% if loja_filtro == loja.id|stringformat:"s" %}selected{% endif %}>{{ loja.nome }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-md-6">
+    <input type="text" name="produto" class="form-control" placeholder="Buscar por nome do produto..." value="{{ nome_filtro }}">
+  </div>
+  <div class="col-12 col-md-2">
+    <button type="submit" class="btn btn-outline-primary w-100">Filtrar</button>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Status</th><th>Produto</th><th>Marca</th><th>Lote</th><th>Validade</th><th>Dias p/ Vencer</th><th>Qtd</th><th>Loja</th></tr>
+    </thead>
+    <tbody>
+    {% for lote in lotes %}
+      {% with status=lote.status_validade %}
+      <tr class="{% if status.0 == 'vencido' %}table-dark{% elif status.0 == 'critico' %}table-danger{% elif status.0 == 'atencao' %}table-warning{% endif %}">
+        <td>
+          <span class="badge {% if status.0 == 'vencido' %}bg-dark{% elif status.0 == 'critico' %}bg-danger{% elif status.0 == 'atencao' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+            {{ status.1 }}
+          </span>
+        </td>
+        <td>{{ lote.produto.nome }}</td>
+        <td>{{ lote.produto.marca|default:"-" }}</td>
+        <td>{{ lote.lote|default:"-" }}</td>
+        <td>{{ lote.validade|date:"d/m/Y" }}</td>
+        <td>{{ lote.dias_para_vencer }}</td>
+        <td>{{ lote.quantidade }}</td>
+        <td>{{ lote.loja_atual.nome }}</td>
+      </tr>
+      {% endwith %}
+    {% empty %}
+      <tr><td colspan="8" class="text-center text-muted">Nenhum lote encontrado.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
